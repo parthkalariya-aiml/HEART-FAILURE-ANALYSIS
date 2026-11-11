@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heart Failure Risk Predictor</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; padding: 2rem; display: flex; justify-content: center; }
+        .container { background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 600px; width: 100%; }
+        h2 { color: #2c3e50; text-align: center; margin-bottom: 1.5rem; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .input-group { display: flex; flex-direction: column; }
+        label { font-size: 0.85rem; color: #34495e; margin-bottom: 5px; font-weight: bold; }
+        input, select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        button { grid-column: span 2; padding: 12px; background-color: #3498db; color: white; border: none; border-radius: 5px; font-size: 1rem; cursor: pointer; margin-top: 15px; font-weight: bold; }
+        button:hover { background-color: #2980b9; }
+        #result-box { margin-top: 20px; padding: 15px; text-align: center; border-radius: 5px; font-size: 1.2rem; font-weight: bold; display: none; }
+        .High { background-color: #ffeaa7; color: #d35400; }
+        .Low { background-color: #55efc4; color: #00b894; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>Patient Readmission Predictor</h2>
+        <form id="prediction-form">
+            <div class="form-grid" id="form-fields">
+                <!-- JavaScript will inject the input fields here automatically -->
+            </div>
+            <button type="submit">Analyze Patient Risk</button>
+        </form>
+
+        <div id="result-box"></div>
+    </div>
+
+    <script>
+        // 1. Define the exact fields our API expects (Blood_Glucose fixed to use underscore)
+        const patientFields = {
+            "Age": 65, "Gender": "Male", "BMI": 28.5, "Smoking_Status": "Former", 
+            "Alcohol_Consumption": "Occasional", "Exercise_Frequency": 1, "Hypertension": 1, 
+            "Diabetes": 0, "Chronic_Kidney_Disease": 0, "Coronary_Artery_Disease": 1, 
+            "Previous_Stroke": 0, "Atrial_Fibrillation": 1, "Previous_HF_Admissions": 1, 
+            "Previous_Hospital_Admissions": 2, "Heart_Failure_Type": "HFrEF", "NYHA_Class": 3, 
+            "Ejection_Fraction": 35.5, "Systolic_BP": 130.0, "Diastolic_BP": 85.0, 
+            "Heart_Rate": 78.0, "Oxygen_Saturation": 96.0, "Creatinine": 1.2, 
+            "Sodium": 138.0, "Potassium": 4.5, "Hemoglobin": 13.5, 
+            "Blood_Glucose": 110.0, 
+            "Emergency_Admission": 1, "Beta_Blocker": 1, "Length_of_Stay": 5, 
+            "ICU_Admission": 0, "BNP": 450.0, "ACE_ARB": 1, "Diuretic": 1, "SGLT2_Inhibitor": 0
+        };
+
+        // 2. Automatically generate the HTML form based on the fields above
+        const formContainer = document.getElementById('form-fields');
+        for (const [key, value] of Object.entries(patientFields)) {
+            const group = document.createElement('div');
+            group.className = 'input-group';
+            
+            const label = document.createElement('label');
+            label.innerText = key.replace(/_/g, ' '); // Make labels look pretty
+            
+            const input = document.createElement('input');
+            input.id = key;
+            input.value = value; // Set default value for easy testing
+            
+            // Check if it should be text or a number
+            input.type = typeof value === 'string' ? 'text' : 'number';
+            if (typeof value === 'number' && !Number.isInteger(value)) input.step = '0.1';
+
+            group.appendChild(label);
+            group.appendChild(input);
+            formContainer.appendChild(group);
+        }
+
+        // 3. Handle the form submission and send data to our FastAPI server
+        document.getElementById('prediction-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Gather all the data from the form
+            const payload = {};
+            for (const key of Object.keys(patientFields)) {
+                const inputValue = document.getElementById(key).value;
+                payload[key] = typeof patientFields[key] === 'number' ? Number(inputValue) : inputValue;
+            }
+
+            try {
+                const response = await fetch('http://127.0.0.1:8000/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await response.json();
+                
+                const resultBox = document.getElementById('result-box');
+                resultBox.style.display = 'block';
+                
+                if (response.status === 422) {
+                    // This will print EXACTLY what FastAPI is rejecting
+                    resultBox.className = 'High';
+                    resultBox.innerHTML = `Validation Error: ${JSON.stringify(result.detail)}`;
+                } else if (result.readmission_probability !== undefined) {
+                    resultBox.className = result.risk_level === 'High Risk' ? 'High' : 'Low';
+                    resultBox.innerHTML = `AI Assessment: ${result.risk_level} <br> Probability: ${(result.readmission_probability * 100).toFixed(1)}%`;
+                } else {
+                    resultBox.className = 'High';
+                    resultBox.innerHTML = `Error: ${JSON.stringify(result)}`;
+                }
+                
+            } catch (error) {
+                alert("Could not connect to the API. Is your Uvicorn server running?");
+            }
+        });
+    </script>
+</body>
+</html>
