@@ -20,7 +20,7 @@ Hospital readmissions are a critical metric for healthcare quality and cost. Thi
 
 **1. Clone the repository**
 \`\`\`bash
-git clone https://github.com/YOUR-USERNAME/heart-failure-predictor.git
+https://github.com/parthkalariya-aiml/HEART-FAILURE-ANALYSIS
 cd heart-failure-predictor
 \`\`\`
 
